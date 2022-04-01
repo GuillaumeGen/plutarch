@@ -17,6 +17,7 @@ import Plutarch.Api.V1 (
   PTxInfo,
   PValue,
  )
+import qualified Plutarch.Api.V1.AssocMap as AssocMap
 import qualified Plutarch.Api.V1.Value as PValue
 import Plutarch.Builtin (pasConstr, pforgetData)
 import Plutarch.Prelude
@@ -54,6 +55,17 @@ spec = do
           plift p @?= mint
         "valueOf" @| PValue.valueOf # pmint # pconstant "c0" # pconstant "sometoken" @-> \p ->
           plift p @?= 1
+    describe "map" $ do
+      pgoldenSpec $ do
+        let pmap, pdmap :: Term _ (AssocMap.PMap PByteString PInteger)
+            pmap = AssocMap.singleton # pconstant "key" # 42
+            pdmap = AssocMap.singletonData # pdata (pconstant "key") # pdata 42
+        "lookup" @| AssocMap.lookup # pconstant "key" # pmap #== pcon (PJust 42) @-> passert
+        "lookupData"
+          @| AssocMap.lookupData # pdata (pconstant "key") # pmap #== pcon (PJust $ pdata 42)
+          @-> passert
+        "singleton" @| pmap @-> pshouldReallyBe pdmap
+        "singletonData" @| pdmap @-> pshouldReallyBe pmap
     describe "example" $ do
       -- The checkSignatory family of functions implicitly use tracing due to
       -- monadic syntax, and as such we need two sets of tests here.
@@ -210,3 +222,6 @@ getFields = phoistAcyclic $ plam $ \addr -> psndBuiltin #$ pasConstr # addr
 
 dummyCurrency :: CurrencySymbol
 dummyCurrency = Value.currencySymbol "\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11"
+
+pshouldReallyBe :: ClosedTerm a -> ClosedTerm a -> Expectation
+pshouldReallyBe = pshouldBe
