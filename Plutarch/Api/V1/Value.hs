@@ -18,6 +18,7 @@ import qualified Plutarch.Api.V1.AssocMap as AssocMap
 import Plutarch.Lift (
   DerivePConstantViaBuiltin (DerivePConstantViaBuiltin),
   DerivePConstantViaNewtype (DerivePConstantViaNewtype),
+  PConstantDecl,
   PLifted,
   PUnsafeLiftDecl,
  )
@@ -32,7 +33,7 @@ instance PUnsafeLiftDecl PTokenName where type PLifted PTokenName = Plutus.Token
 deriving via
   (DerivePConstantViaBuiltin Plutus.TokenName PTokenName PByteString)
   instance
-    (PConstant Plutus.TokenName)
+    PConstantDecl Plutus.TokenName
 
 newtype PCurrencySymbol (s :: S) = PCurrencySymbol (Term s PByteString)
   deriving (PlutusType, PIsData, PEq, POrd) via (DerivePNewtype PCurrencySymbol PByteString)
@@ -41,7 +42,7 @@ instance PUnsafeLiftDecl PCurrencySymbol where type PLifted PCurrencySymbol = Pl
 deriving via
   (DerivePConstantViaBuiltin Plutus.CurrencySymbol PCurrencySymbol PByteString)
   instance
-    (PConstant Plutus.CurrencySymbol)
+    PConstantDecl Plutus.CurrencySymbol
 
 newtype PValue (s :: S) = PValue (Term s (PMap PCurrencySymbol (PMap PTokenName PInteger)))
   deriving
@@ -52,7 +53,7 @@ instance PUnsafeLiftDecl PValue where type PLifted PValue = Plutus.Value
 deriving via
   (DerivePConstantViaNewtype Plutus.Value PValue (PMap PCurrencySymbol (PMap PTokenName PInteger)))
   instance
-    (PConstant Plutus.Value)
+    PConstantDecl Plutus.Value
 
 instance PEq PValue where
   a #== b = isZero #$ unionWith # plam (-) # a # b
