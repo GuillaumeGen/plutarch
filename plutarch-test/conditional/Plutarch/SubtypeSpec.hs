@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Plutarch.TryFromSpec (spec) where
+module Plutarch.SubtypeSpec (spec) where
 
 -- Haskell imports
 import qualified GHC.Generics as GHC
@@ -54,11 +54,11 @@ import Plutarch.Builtin (
   ppairDataBuiltin,
  )
 
-import Plutarch.TryFrom (
-  PTryFrom,
-  PTryFromExcess,
-  ptryFrom,
-  ptryFrom',
+import Plutarch.Subtype (
+  PSubtype,
+  PSubtypeExcess,
+  pdowncast,
+  pdowncast',
  )
 
 import Plutarch.Reducible (Reduce, Reducible)
@@ -152,7 +152,7 @@ spec = do
           (punsafeCoerce $ pconstant $ Constr 1 [PlutusTx.I 5, B "foo"])
         @-> psucceeds
       "recover PWrapInt"
-        @| pconstant 42 #== (unTermCont $ snd <$> tcont (ptryFrom @(PAsData PWrapInt) (pforgetData $ pdata $ pconstant @PInteger 42)))
+        @| pconstant 42 #== (unTermCont $ snd <$> tcont (pdowncast @(PAsData PWrapInt) (pforgetData $ pdata $ pconstant @PInteger 42)))
         @-> passert
     "recovering a record partially vs completely" @\ do
       "partially"
@@ -245,23 +245,23 @@ spec = do
 
 checkDeep ::
   forall (target :: PType) (actual :: PType).
-  ( PTryFrom PData (PAsData target)
+  ( PSubtype PData (PAsData target)
   , PIsData actual
   , PIsData target
   ) =>
   ClosedTerm (PAsData actual) ->
   ClosedTerm (PAsData target)
-checkDeep t = unTermCont $ fst <$> TermCont (ptryFrom @(PAsData target) $ pforgetData t)
+checkDeep t = unTermCont $ fst <$> TermCont (pdowncast @(PAsData target) $ pforgetData t)
 
 checkDeepUnwrap ::
   forall (target :: PType) (actual :: PType) (s :: S).
-  ( PTryFrom PData (PAsData target)
+  ( PSubtype PData (PAsData target)
   , PIsData actual
   , PIsData target
   ) =>
   Term s (PAsData actual) ->
   Term s (PAsData target)
-checkDeepUnwrap t = unTermCont $ fst <$> TermCont (ptryFrom @(PAsData target) $ pforgetData t)
+checkDeepUnwrap t = unTermCont $ fst <$> TermCont (pdowncast @(PAsData target) $ pforgetData t)
 
 sampleStructure :: Term _ (PAsData (PBuiltinList (PAsData (PBuiltinList (PAsData (PBuiltinList (PAsData PInteger)))))))
 sampleStructure = pdata $ psingleton #$ pdata $ psingleton #$ toDatadList [1 .. 100]
@@ -271,10 +271,10 @@ partialCheck :: Term _ (PAsData (PBuiltinList (PAsData (PBuiltinList PData))))
 partialCheck =
   let dat :: Term _ PData
       dat = pforgetData sampleStructure
-   in unTermCont $ fst <$> TermCont (ptryFrom dat)
+   in unTermCont $ fst <$> TermCont (pdowncast dat)
 
 fullCheck :: Term _ (PAsData (PBuiltinList (PAsData (PBuiltinList (PAsData (PBuiltinList (PAsData PInteger)))))))
-fullCheck = unTermCont $ fst <$> TermCont (ptryFrom $ pforgetData sampleStructure)
+fullCheck = unTermCont $ fst <$> TermCont (pdowncast $ pforgetData sampleStructure)
 
 ------------------- Example: untrusted Redeemer ------------------------------------
 
@@ -290,17 +290,17 @@ newtype Flip f b a = Flip (f a b)
 instance Reducible (f a b) => Reducible (Flip f b a) where
   type Reduce (Flip f b a) = Reduce (f a b)
 
-instance PTryFrom PData (PAsData PNatural) where
-  type PTryFromExcess PData (PAsData PNatural) = Flip Term PNatural
-  ptryFrom' opq = runTermCont $ do
-    (ter, exc) <- TermCont $ ptryFrom @(PAsData PInteger) opq
+instance PSubtype PData (PAsData PNatural) where
+  type PSubtypeExcess PData (PAsData PNatural) = Flip Term PNatural
+  pdowncast' opq = runTermCont $ do
+    (ter, exc) <- TermCont $ pdowncast @(PAsData PInteger) opq
     ver <- tcont $ plet $ pmkNatural #$ exc
     pure $ (punsafeCoerce ter, ver)
 
 validator :: Term s PValidator
 validator = phoistAcyclic $
   plam $ \dat red ctx -> unTermCont $ do
-    trustedRedeemer <- (\(snd -> red) -> red) <$> (TermCont $ ptryFrom @(PAsData (PBuiltinList (PAsData PNatural))) red)
+    trustedRedeemer <- (\(snd -> red) -> red) <$> (TermCont $ pdowncast @(PAsData (PBuiltinList (PAsData PNatural))) red)
     let trustedDatum :: Term _ (PBuiltinList (PAsData PNatural))
         trustedDatum = pfromData $ punsafeCoerce dat
     -- make the Datum and Redeemer trusted
@@ -432,12 +432,12 @@ toDatadList = pdata . (foldr go pnil)
 
 mapTestSucceeds :: ClosedTerm (PAsData (PBuiltinMap PByteString PInteger))
 mapTestSucceeds = unTermCont $ do
-  (val, _) <- TermCont $ ptryFrom $ pforgetData sampleMap
+  (val, _) <- TermCont $ pdowncast $ pforgetData sampleMap
   pure val
 
 mapTestFails :: ClosedTerm (PAsData (PBuiltinMap PInteger PInteger))
 mapTestFails = unTermCont $ do
-  (val, _) <- TermCont $ ptryFrom $ pforgetData sampleMap
+  (val, _) <- TermCont $ pdowncast $ pforgetData sampleMap
   pure val
 
 sampleMap :: Term _ (PAsData (PBuiltinMap PByteString PInteger))
@@ -457,7 +457,7 @@ sampleABdata :: Term s PData
 sampleABdata = pforgetData sampleAB
 
 recoverAB :: Term s (PAsData PAB)
-recoverAB = unTermCont $ fst <$> (tcont $ ptryFrom sampleABdata)
+recoverAB = unTermCont $ fst <$> (tcont $ pdowncast sampleABdata)
 
 data PAB (s :: S)
   = PA (Term s (PDataRecord '["_0" ':= PInteger, "_1" ':= PByteString]))
@@ -468,9 +468,9 @@ data PAB (s :: S)
     (PlutusType, PIsData)
     via PIsDataReprInstances PAB
 
--- here we can derive the `PTryFrom` instance for PAB via the newtype wrapper
+-- here we can derive the `PSubtype` instance for PAB via the newtype wrapper
 -- `PIsDataReprInstances`
-deriving via PAsData (PIsDataReprInstances PAB) instance PTryFrom PData (PAsData PAB)
+deriving via PAsData (PIsDataReprInstances PAB) instance PSubtype PData (PAsData PAB)
 
 ------------------- Sample usage with recovered record type ------------------------
 
@@ -482,7 +482,7 @@ untrustedRecord =
 
 theField :: Term s PInteger
 theField = unTermCont $ do
-  (_, exc) <- tcont (ptryFrom @(PAsData (PDataRecord '["_0" ':= (PDataRecord '["_1" ':= PInteger])])) untrustedRecord)
+  (_, exc) <- tcont (pdowncast @(PAsData (PDataRecord '["_0" ':= (PDataRecord '["_1" ':= PInteger])])) untrustedRecord)
   pure $ snd . getField @"_1" . snd . snd . getField @"_0" . snd $ exc
 
 ------------------- Sample usage DerivePNewType ------------------------------------
@@ -490,4 +490,4 @@ theField = unTermCont $ do
 newtype PWrapInt (s :: S) = PMkWrapInt (Term s PInteger)
   deriving (PlutusType, PIsData, PEq, POrd) via (DerivePNewtype PWrapInt PInteger)
 
-deriving via DerivePNewtype (PAsData PWrapInt) (PAsData PInteger) instance PTryFrom PData (PAsData PWrapInt)
+deriving via DerivePNewtype (PAsData PWrapInt) (PAsData PInteger) instance PSubtype PData (PAsData PWrapInt)

@@ -124,9 +124,9 @@ library
     Plutarch.Reducible
     Plutarch.Show
     Plutarch.String
+    Plutarch.Subtype
     Plutarch.TermCont
     Plutarch.Trace
-    Plutarch.TryFrom
     Plutarch.Unit
     Plutarch.Unsafe
 

@@ -145,7 +145,7 @@ executable plutarch-test
     other-modules:
       Plutarch.FieldSpec
       Plutarch.MonadicSpec
-      Plutarch.TryFromSpec
+      Plutarch.SubtypeSpec
 
   other-modules:
     BaseSpec
