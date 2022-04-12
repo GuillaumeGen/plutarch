@@ -6,6 +6,7 @@ module Plutarch.Subtype (
   PSubtype (..),
   HRecP (..),
   pdowncast,
+  pupcast,
 ) where
 
 import Data.Proxy (Proxy (Proxy))
@@ -88,27 +89,10 @@ import Data.Coerce (coerce)
 ----------------------- The class PSubtype ----------------------------------------------
 
 {- |
-    This checks the data structure for validity.
-    If you don't care about parts of the structure
-    don't verify those parts, just put a `PData` at
-    the places you don't care about.
-    Be aware this might get really expensive, so only
-    use it if you cannot establish trust otherwise
-    (e.g. via only checking a part of your Data with
-    PSubtype)
-    Laws:
-      - the operation `pdowncast` mustn't change the representation of the underlying data
-      - the operation `pdowncast` must always prove the integrity of the whole target type
-        - example:
-          `pdowncast PData (PAsData (PBuiltinList PData))` must only succeed if the underlying
-          representation is a `BuiltinList` containing any `PData`
-        - all conversions are fallible, this happens if the representation doesn't match
-          the expected type.
-      - the operation `pdowncast @b @a` proves equality between the less expressive `PType` `a` and
-        the more expressive `PType` `b`, hence the first element of the resulting Tuple
-        must always be wrapped in `PAsData` if the origin type was `PData` (see law 1)
-      - the result type `b` must always be safe than the origin type `a`, i.e. it must carry
-        more information
+@PSubtype a b@ represents a subtyping relationship between @a@ and @b@.
+Laws:
+- @(punsafeCoerce . fst) <$> tcont (pdowncast x) ≡ pure x@
+- Any term that is a @b@ should also be a valid @a@.
 -}
 class PSubtype (a :: PType) (b :: PType) where
   type PSubtypeExcess a b :: PType
@@ -116,6 +100,9 @@ class PSubtype (a :: PType) (b :: PType) where
 
 pdowncast :: forall b a s r. PSubtype a b => Term s a -> ((Term s b, Reduce (PSubtypeExcess a b s)) -> Term s r) -> Term s r
 pdowncast = pdowncast'
+
+pupcast :: forall a b s. PSubtype a b => Term s b -> Term s a
+pupcast = punsafeCoerce
 
 ----------------------- Reducible and Flip ----------------------------------------------
 
